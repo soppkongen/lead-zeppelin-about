@@ -1,25 +1,31 @@
-export default async function handler(req, res) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
+import express from "express";
+import Stripe from "stripe";
 
-    try {
-        const event = req.body;
-        console.log('✅ Webhook Event Received:', event);
+const stripe = new Stripe("your_stripe_secret_key", { apiVersion: "2024-02-24" });
+const app = express();
 
-        if (event.object === 'checkout.session' && event.object.payment_status === 'paid') {
-            console.log(`💰 Payment received: ${event.object.amount_total / 100} ${event.object.currency.toUpperCase()}`);
-            // Process the payment logic here (e.g., store data, trigger referral payout, etc.)
-        }
+app.use(express.json());
 
-        if (event.object === 'charge' && event.object.status === 'succeeded') {
-            console.log(`💸 Charge Succeeded: ${event.object.amount / 100} ${event.object.currency.toUpperCase()}`);
-            // Handle charge success (e.g., confirm funds, update user status)
-        }
+// Webhook route
+app.post("/api/webhook", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  const endpointSecret = "your_webhook_secret"; // Found in Stripe Dashboard
 
-        res.status(200).json({ received: true });
-    } catch (err) {
-        console.error('❌ Webhook Error:', err);
-        res.status(400).json({ error: 'Webhook handler failed' });
-    }
-}
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.error("Webhook signature verification failed.", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  console.log("✅ Webhook Received:", event.type);
+
+  if (event.type === "checkout.session.completed") {
+    console.log("✅ Payment Successful:", event.data.object);
+  }
+
+  res.json({ received: true });
+});
+
+app.listen(3000, () => console.log("✅ Server running on port 3000"));
