@@ -1,34 +1,20 @@
-import { buffer } from "micro";
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-export const config = {
-    api: {
-        bodyParser: false,
-    },
-};
-
 export default async function handler(req, res) {
-    if (req.method !== "POST") {
-        return res.status(405).send("Method Not Allowed");
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const sig = req.headers["stripe-signature"];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event;
     try {
-        const rawBody = await buffer(req);
-        event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
+        const event = req.body;
+        console.log('Received webhook event:', event);
+
+        // ✅ If a payment is completed, log it
+        if (event.object?.payment_status === 'paid') {
+            console.log(`💰 Payment received: ${event.object.amount_total / 100} ${event.object.currency.toUpperCase()}`);
+        }
+
+        res.status(200).json({ received: true });
     } catch (err) {
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+        console.error('❌ Webhook Error:', err);
+        res.status(400).json({ error: 'Webhook handler failed' });
     }
-
-    if (event.type === "checkout.session.completed") {
-        console.log("✅ Payment successful!", event);
-        // Handle the referral payout logic here
-    }
-
-    res.json({ received: true });
 }
