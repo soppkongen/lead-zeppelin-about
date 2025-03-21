@@ -22,7 +22,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     console.log("✅ Payment successful:", session.customer_details.email);
-    console.log("🔗 Referral Metadata:", session.metadata);
+    console.log("🔗 Referral ID:", session.client_reference_id);
 
     // You can handle successful payment logic here
   }
