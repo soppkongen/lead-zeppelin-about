@@ -2,11 +2,28 @@
 import stripe from 'stripe';
 import { kv } from '@vercel/kv';
 
-// Initialize Stripe with your secret key (set in Vercel environment variables)
+// Initialize Stripe with your secret key
 const stripeClient = stripe(process.env.STRIPE_SECRET_KEY);
 
+// Export the config to disable body parsing for this function
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+// Helper function to get the raw body as a Buffer
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 export default async function handler(req, res) {
-  // Only allow POST requests (Stripe webhooks are POST)
+  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -14,12 +31,20 @@ export default async function handler(req, res) {
   // Get the Stripe signature from the headers
   const sig = req.headers['stripe-signature'];
 
-  // Buffer the request body (Vercel might not provide it as a raw buffer)
+  // Get the raw body
+  let rawBody;
+  try {
+    rawBody = await getRawBody(req);
+  } catch (err) {
+    console.error('Error reading raw body:', err.message);
+    return res.status(400).json({ error: 'Failed to read request body' });
+  }
+
+  // Construct the event using the raw body and webhook secret
   let event;
   try {
-    // Construct the event using the raw body and webhook secret
     event = stripeClient.webhooks.constructEvent(
-      req.body,
+      rawBody,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
@@ -73,6 +98,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Respond to Stripe to acknowledge receipt of the webhook
+  // Respond to Stripe
   res.status(200).json({ received: true });
 }
