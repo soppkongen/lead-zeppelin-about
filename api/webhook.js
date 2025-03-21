@@ -25,6 +25,14 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
     // handle successful payment here
   }
 
+if (event.type === "checkout.session.completed") {
+  const session = event.data.object;
+  console.log("✅ Payment successful:", session.customer_details.email);
+  
+  // Check and log referral metadata clearly:
+  console.log("🔗 Referral Metadata:", session.metadata);
+}
+
   res.json({ received: true });
 });
 
