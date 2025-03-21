@@ -1,11 +1,13 @@
 import express from "express";
 import Stripe from "stripe";
+import axios from "axios";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-02-24" });
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const sheetBestUrl = "https://api.sheetbest.com/sheets/5d9e52cb-96ef-40e0-9aaa-017c261350b6";
 const app = express();
 
-// Webhook handler clearly using express.raw() for Stripe
+// Webhook handler using express.raw() for Stripe
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
 
@@ -22,9 +24,21 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     console.log("✅ Payment successful:", session.customer_details.email);
-    console.log("🔗 Referral ID:", session.client_reference_id);
+    console.log("🔗 Referral ID:", session.client_reference_id || "none");
+    
+    const referralCode = 'ref-' + Math.random().toString(36).substring(2, 8);
 
-    // You can handle successful payment logic here
+    try {
+      await axios.post(sheetBestUrl, {
+        "Email": session.customer_details.email,
+        "Referral Code": referralCode,
+        "Referred By": session.client_reference_id || "none",
+        "Date": new Date().toISOString()
+      });
+      console.log("✅ Referral saved successfully");
+    } catch (error) {
+      console.error("❌ Failed to save referral:", error.message);
+    }
   }
 
   res.json({ received: true });
