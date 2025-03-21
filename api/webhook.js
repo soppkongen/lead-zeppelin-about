@@ -1,50 +1,43 @@
-import express from "express";
-import Stripe from "stripe";
-import axios from "axios";
+import Stripe from 'stripe';
+import { kv } from '@vercel/kv';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-02-24" });
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-const sheetBestUrl = "https://api.sheetbest.com/sheets/5d9e52cb-96ef-40e0-9aaa-017c261350b6";
-const app = express();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Webhook handler using express.raw() for Stripe
-app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
+export default async function handler(req, res) {
+    if (req.method !== 'POST') return res.status(405).end();
 
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-  } catch (err) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  console.log("✅ Webhook Received:", event.type);
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    console.log("✅ Payment successful:", session.customer_details.email);
-    console.log("🔗 Referral ID:", session.client_reference_id || "none");
-    
-    const referralCode = 'ref-' + Math.random().toString(36).substring(2, 8);
-
+    const sig = req.headers['stripe-signature'];
     try {
-      await axios.post(sheetBestUrl, {
-        "Email": session.customer_details.email,
-        "Referral Code": referralCode,
-        "Referred By": session.client_reference_id || "none",
-        "Date": new Date().toISOString()
-      });
-      console.log("✅ Referral saved successfully");
-    } catch (error) {
-      console.error("❌ Failed to save referral:", error.message);
+        const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const email = session.customer_details?.email || 'unknown';
+            const paymentDate = new Date(session.created * 1000).toISOString();
+            const referralCode = Math.random().toString(36).substring(2, 10);
+            const referralLink = `https://lead-zeppelin.club?ref=${referralCode}`;
+
+            // Check if user was referred
+            const referrerCode = session.client_reference_id || null;
+
+            const userData = { email, paymentDate, referralLink, referrerCode, referrals: [] };
+            await kv.set(`user:${email}`, JSON.stringify(userData));
+
+            if (referrerCode) {
+                const referrerData = await kv.get(`user:referrer:${referrerCode}`);
+                if (referrerData) {
+                    const referrer = JSON.parse(referrerData);
+                    referrer.referrals.push({ email, earned: 20 });
+                    await kv.set(`user:referrer:${referrerCode}`, JSON.stringify(referrer));
+                }
+            }
+
+            console.log(`✅ New user registered: ${email}, Referral Link: ${referralLink}`);
+        }
+        res.status(200).end();
+    } catch (err) {
+        console.error(err);
+        res.status(400).send(`Webhook Error: ${err.message}`);
     }
-  }
+}
 
-  res.json({ received: true });
-});
-
-// Other routes can safely use express.json()
-app.use(express.json());
-
-app.listen(3000, () => console.log("🚀 Server running on port 3000"));
+export const config = { api: { bodyParser: false } };
