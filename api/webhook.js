@@ -5,11 +5,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-02-
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const app = express();
 
-// Use express.raw() ONLY for webhook route:
+// Webhook handler clearly using express.raw() for Stripe
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
-  let event;
 
+  let event;
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
   } catch (err) {
@@ -21,22 +21,16 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    console.log("✅ Payment Successful for:", session.customer_details.email);
-    // handle successful payment here
-  }
+    console.log("✅ Payment successful:", session.customer_details.email);
+    console.log("🔗 Referral Metadata:", session.metadata);
 
-if (event.type === "checkout.session.completed") {
-  const session = event.data.object;
-  console.log("✅ Payment successful:", session.customer_details.email);
-  
-  // Check and log referral metadata clearly:
-  console.log("🔗 Referral Metadata:", session.metadata);
-}
+    // You can handle successful payment logic here
+  }
 
   res.json({ received: true });
 });
 
-// For other routes, use express.json():
+// Other routes can safely use express.json()
 app.use(express.json());
 
 app.listen(3000, () => console.log("🚀 Server running on port 3000"));
