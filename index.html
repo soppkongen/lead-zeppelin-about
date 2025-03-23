@@ -129,11 +129,11 @@
         <h2>🔥 Why This Works</h2>
         <p>**The earlier you start, the bigger your reach.** This isn’t a get-rich-quick scheme—it’s about **owning your list, your audience, and your results.**</p>
 
-        <a href="https://buy.stripe.com/cN26pb7Bf4k467C3cc" class="cta">🔥 Join Now – Before the Next Price Jump</a>
+        <a href="https://buy.stripe.com/eVaaFraNr7wgbrW3cd" class="cta">🔥 Join Now – Before the Next Price Jump</a>
     </div> 
 
     <!-- Sticky Button -->
-    <a href="https://buy.stripe.com/cN26pb7Bf4k467C3cc" class="sticky-btn">🔥 Join Now</a>
+    <a href="https://buy.stripe.com/eVaaFraNr7wgbrW3cd" class="sticky-btn">🔥 Join Now</a>
 
     <!-- Twitter Conversion Tracking Pixel -->
     <script>
@@ -150,6 +150,11 @@
         a.parentNode.insertBefore(u,a))
     }(window,document,'script');
     twq('config','pbxu7');
+
+    // Fire 'Purchase' event if redirected after Stripe payment
+    if (window.location.search.includes('purchased=true')) {
+        twq('track', 'Purchase');
+    }
     </script>
 
 </body>
